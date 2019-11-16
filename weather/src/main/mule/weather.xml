@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="1b679626-bb05-4228-8b7c-8fa106e91a65" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="534cc1f6-fa19-4594-9f83-61c1ab23cee6" >
+		<http:request-connection host="api.meteostat.net" protocol="HTTPS"/>
+	</http:request-config>
+	<http:listener-config name="HTTP_Listener_config1" doc:name="HTTP Listener config" doc:id="75be5c47-2064-4a05-b7d9-beb4ac328af1" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<http:listener-config name="HTTP_Listener_config2" doc:name="HTTP Listener config" doc:id="750f83f4-dfc0-4c8c-800e-1e1549061dbd" >
+		<http:listener-connection host="0.0.0.0" port="8083" />
+	</http:listener-config>
+	<flow name="max_temperature_in_given_month" doc:id="1f44cadf-c7e7-4801-aa30-1c29cc495a3e" >
+		<http:listener doc:name="Listener" doc:id="6aa97f90-e3bf-4da6-88fa-d24e5a8662a3" config-ref="HTTP_Listener_config" path="/maxtemp"/>
+		<set-variable value="#[attributes.queryParams.start]" doc:name="start" doc:id="67170838-0ba2-4875-9afb-57e101a73ab1" variableName="start"/>
+		<set-variable value="#[attributes.queryParams.end]" doc:name="end" doc:id="4c1a6d96-3076-427d-850f-97d4bd7cbe2b" variableName="end"/>
+		<http:request method="GET" doc:name="Request" doc:id="54b43448-06e6-4293-adf2-4cce278d1a2b" config-ref="HTTP_Request_configuration" path="/v1/history/daily">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"start" : vars.start,
+	"key" : "lR0cZrnk",
+	"end" : vars.end,
+	"station" : "10637"
+}]]]></http:query-params>
+		</http:request>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="008f1e83-f74c-421f-b812-50b3f7d4b7ea" />
+		<ee:transform doc:name="Transform Message" doc:id="4265c8bd-3ea7-4c00-9138-68cf2bd8fc83" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+
+"Maximum temp: " ++ max(payload.data.temperature)
+	
+	]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value='#[payload]' doc:name="Set Payload" doc:id="a680bfd0-e8c3-4ca1-9975-ff62f5874bb2" />
+	</flow>
+	<flow name="lowest_temp_per_week" doc:id="17e6d59e-c0f0-4d2c-a64c-d32cfaacc2af" >
+		<http:listener doc:name="Copy_of_Listener" doc:id="9a6816d1-e37c-438f-96fa-63f972d13b17" config-ref="HTTP_Listener_config" path="/lowtemp" />
+		<http:request method="GET" doc:name="Copy_of_Request" doc:id="9769a2cf-9154-4dc2-8f56-4dfd53b6c980" config-ref="HTTP_Request_configuration" path="/v1/history/daily" >
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"start" : "2017-01-01",
+	"key" : "lR0cZrnk",
+	"end" : "2017-12-31",
+	"station" : "10637"
+}]]]></http:query-params>
+		</http:request>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="4a9fd347-4913-4859-bcf2-945ca2dff7fa" />
+		<ee:transform doc:name="Transform Message" doc:id="108f9314-5512-47ea-8852-f26340811a21" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Arrays
+output application/json
+---
+payload.data divideBy 7 map ((item, index) -> {
+   "$index": min(item.temperature)
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="avg_percipitatio_per_month" doc:id="9f38d8ff-7f3c-4baa-97bb-867baf6b1600" >
+		<http:listener doc:name="Copy_of_Copy_of_Listener" doc:id="ec103de1-edd6-457c-8882-882309aca5a9" config-ref="HTTP_Listener_config" path="/permonth" />
+		<http:request method="GET" doc:name="Copy_of_Copy_of_Request" doc:id="0598f3b2-087f-4a1f-ab1f-228b578a05f6" config-ref="HTTP_Request_configuration" path="/v1/history/daily" >
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"start" : "2017-01-01",
+	"key" : "lR0cZrnk",
+	"end" : "2017-12-31",
+	"station" : "10637"
+}]]]></http:query-params>
+		</http:request>
+		<set-payload value="#[payload]" doc:name="Copy_of_Set Payload" doc:id="9da37ed9-e2cc-4dd5-8676-c4c38f33c23e" />
+		<ee:transform doc:name="Copy_of_Transform Message" doc:id="d0f1d0da-d5d2-44c9-93bd-74d33f94d49b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Arrays
+fun getMonth(date: String) =
+   date[5 to 6]
+fun getPreceData(data) =
+   filter(data, (item, index) -> item.precipitation != null)
+---
+using(data = payload.data groupBy ((item, index) -> getMonth(item.date)))
+{
+   Jan: sum(getPreceData(data."01").precipitation) / sizeOf(data."01"),
+   Feb : sum(getPreceData(data."02").precipitation) / sizeOf(data."02"),
+   Mar : sum(getPreceData(data."03").precipitation)/ sizeOf(data."03"),
+   Apr : sum(getPreceData(data."04").precipitation) / sizeOf(data."04"),
+   May : sum(getPreceData(data."05").precipitation) / sizeOf(data."05"),
+   June : sum(getPreceData(data."06").precipitation)/ sizeOf(data."06"),
+   Jul : sum(getPreceData(data."07").precipitation) / sizeOf(data."07"),
+   Aug : sum(getPreceData(data."08").precipitation) / sizeOf(data."08"),
+   sept : sum(getPreceData(data."09").precipitation) / sizeOf(data."09"),
+   Oct : sum(getPreceData(data."10").precipitation) / sizeOf(data."10"),
+   Nov : sum(getPreceData(data."11").precipitation) / sizeOf(data."11"),
+   Dec : sum(getPreceData(data."12").precipitation) / sizeOf(data."12")
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
